@@ -1,113 +1,104 @@
-'use strict';
+"use strict";
 
-const autoprefixer = require('autoprefixer'),
-      babel = require('babelify'),
-      browserify = require('browserify'),
-      gls = require('gulp-live-server'),
-      del = require('del'),
-      gulp = require('gulp'),
-      ghPages = require('gulp-gh-pages'),
-      rename = require('gulp-rename'),
-      glob = require('glob'),
-      jade = require('gulp-jade'),
-      flatten = require('gulp-flatten'),
-      postcss = require('gulp-postcss'),
-      sass = require('gulp-sass'),
-      source = require('vinyl-source-stream'),
-      es = require('event-stream'),
+const { src, dest, series, parallel, watch } = require("gulp");
+const sass = require("gulp-sass")(require("sass"));
+const postcss = require("gulp-postcss");
+const autoprefixer = require("autoprefixer");
+const babel = require("gulp-babel");
+const browserify = require("browserify");
+const source = require("vinyl-source-stream");
+const buffer = require("vinyl-buffer");
+const del = require("del");
+const rename = require("gulp-rename");
+const pug = require("gulp-pug");
+const browserSync = require("browser-sync").create();
 
-      SRC_DIR = __dirname + '/src/',
-      CSS_BUILD = __dirname + '/src/stylesheets',
-      JS_BUILD = __dirname + '/src/scripts';
+const paths = {
+  styles: {
+    src: "src/stylesheets/builder.scss",
+    dest: ".build/stylesheets",
+  },
+  scripts: {
+    src: "src/scripts/main-**.js",
+    dest: ".build/scripts",
+  },
+  templates: {
+    src: "src/templates/*.jade",
+    dest: ".build/",
+  },
+  assets: {
+    src: "src/assets/**/*",
+    dest: ".build/assets",
+  },
+  extras: {
+    src: "src/extras/**",
+    dest: ".build/extras",
+  },
+};
 
+function clean() {
+  return del([".build"]);
+}
 
-gulp.task('stylesheets', function () {
-  let processors = [
-    autoprefixer({browsers: ['last 4 version']})
-  ];
+function stylesheets() {
+  return src(paths.styles.src)
+    .pipe(sass().on("error", sass.logError))
+    .pipe(postcss([autoprefixer()]))
+    .pipe(rename("styles.css"))
+    .pipe(dest(paths.styles.dest))
+    .pipe(browserSync.stream());
+}
 
-  del.sync('./.build/stylesheets');
-
-  return gulp.src(CSS_BUILD + '/builder.scss')
-    .pipe(sass().on('error', sass.logError))
-    .pipe(postcss(processors))
-    .pipe(rename('styles.css'))
-    .pipe(gulp.dest('./.build/stylesheets/'));
-});
-
-gulp.task('scripts', (done) => {
-  glob(JS_BUILD + '/main-**.js', (err, files) => {
-    if(err) done(err);
-
-    del.sync('./.build/scripts');
-
-    var tasks = files.map((entry) => {
-      return browserify({
-        entries: [entry],
-        debug: true,
-        })
-        .transform(babel.configure({
-          presets: ["es2015"]
-        }))
-        .bundle()
-        .pipe(source(entry))
-        .pipe(rename({
-          extname: '.bundle.js'
-        }))
-        .pipe(flatten())
-        .pipe(gulp.dest('./.build/scripts/'));
-      });
-    es.merge(tasks).on('end', done);
-  })
-});
-
-gulp.task('assets', (done) => {
-  del.sync('./.build/assets');
-
-  return gulp.src(SRC_DIR + 'assets/**/*')
-    .pipe(gulp.dest('./.build/'));
-})
-
-gulp.task('extras', (done) => {
-  del.sync('./.build/extras');
-
-  return gulp.src(SRC_DIR + 'extras/**')
-    .pipe(gulp.dest('./.build/'));
-});
-
-gulp.task('templates', () => {
-  del.sync('./.build/*.html');
-  return gulp.src('./src/templates/*.jade')
-    .pipe(jade({
-      pretty: true
-    }))
-    .pipe(gulp.dest('./.build/'));
-});
-
-gulp.task('build', ['stylesheets', 'templates', 'scripts', 'extras', 'assets']);
-
-gulp.task('dev', ['build'], () => {
-  let server = gls.static(['.build/','./src/assets/'], 3000);
-  server.start();
-
-  gulp.watch(JS_BUILD + '/**/*.js', ['scripts']);
-  gulp.watch(CSS_BUILD + '/*/*.scss', ['stylesheets']);
-  gulp.watch('./src/templates/*.jade', ['templates']);
-
-  gulp.watch(['./.build/**/*.html', './.build/**/*.js', './.build/**/*.css'],  (file) => {
-    server.notify.apply(server, [file]);
+function scripts() {
+  const b = browserify({
+    entries: ["src/scripts/main-home.js"],
+    debug: true,
+  }).transform("babelify", {
+    presets: ["@babel/preset-env"],
   });
 
-  gulp.watch(['!gulpfile.js'],  (file) => {
-    server.notify.apply(server, [file]);
+  return b
+    .bundle()
+    .pipe(source("main-home.js"))
+    .pipe(buffer())
+    .pipe(rename({ extname: ".bundle.js" }))
+    .pipe(dest(paths.scripts.dest))
+    .pipe(browserSync.stream());
+}
+
+function templates() {
+  return src(paths.templates.src)
+    .pipe(pug({ pretty: true }))
+    .pipe(dest(paths.templates.dest))
+    .pipe(browserSync.stream());
+}
+
+function assets() {
+  return src(paths.assets.src).pipe(dest(paths.assets.dest));
+}
+
+function extras() {
+  return src(paths.extras.src).pipe(dest(paths.extras.dest));
+}
+
+function serve() {
+  browserSync.init({
+    server: {
+      baseDir: ".build",
+    },
+    port: 3000,
   });
 
-  gulp.watch('*.html',  (file) => {
-    server.notify.apply(server, [file]);
-  });
-})
+  watch("src/stylesheets/**/*.scss", stylesheets);
+  watch("src/scripts/**/*.js", scripts);
+  watch("src/templates/*.jade", templates);
+}
 
-gulp.task('deploy', ['build'], function() {
-  return gulp.src('./.build/**/*')
-   .pipe(ghPages());
-});
+const build = series(
+  clean,
+  parallel(stylesheets, scripts, templates, assets, extras)
+);
+
+exports.clean = clean;
+exports.build = build;
+exports.default = series(build, serve);
