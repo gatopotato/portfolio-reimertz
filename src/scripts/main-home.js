@@ -10,11 +10,9 @@ import NightMode from "./modules/NightMode";
 const echo = require("echo-js")(document.body);
 const introText = `hi, my name is samkit jaina.
 
-i am a humble developer@@@#########magician@@@########coder, fake-it-til-you-make-it#######################entrepreneur and everyday hustler.
+i am a humble developer@@@#########magician@@@########coder, fake-it-til-you-make-it#######################entrepreneur and problem solver.
 
-creativity is my addiction.
-
-$http://github.com/gatopotato$github$ | $http://twitter.com/reimertz$twitter$ | $https://www.linkedin.com/in/reimertz$linkedin$ | $mailto:samkitjaina.ind@gmail.com$hire me$ `;
+$http://github.com/gatopotato$github$ | $http://twitter.com/samkitjaina$twitter$ | $https://www.linkedin.com/in/gatopotato$linkedin$ | $mailto:samkitjaina.ind@gmail.com$hire me$ `;
 
 const writer = new Writer(document.querySelectorAll(".writer"), introText);
 const translater = new Translater(document.querySelector(".tre-d"), 10, 10);

@@ -3,7 +3,7 @@ import * as SunCalc from 'suncalc'
 
 const html = document.querySelector('html')
 const button = document.querySelector('[data-night-mode-toggle]')
-let isNightMode = false
+let isNightMode = true
 
 
 function toggleNightMode() {
